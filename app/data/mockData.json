@@ -1,0 +1,343 @@
+{
+  "factories": [
+    {
+      "id": 1,
+      "name": "Nhà máy A",
+      "code": "FAC-A",
+      "x": 100,
+      "y": 100,
+      "color": "#FF6B6B",
+      "type": "manufacturing",
+      "capacity": 50
+    },
+    {
+      "id": 2,
+      "name": "Nhà máy B",
+      "code": "FAC-B",
+      "x": 700,
+      "y": 100,
+      "color": "#4ECDC4",
+      "type": "warehouse",
+      "capacity": 100
+    },
+    {
+      "id": 3,
+      "name": "Nhà máy C",
+      "code": "FAC-C",
+      "x": 700,
+      "y": 500,
+      "color": "#45B7D1",
+      "type": "distribution",
+      "capacity": 75
+    },
+    {
+      "id": 4,
+      "name": "Nhà máy D",
+      "code": "FAC-D",
+      "x": 100,
+      "y": 500,
+      "color": "#FFA07A",
+      "type": "port",
+      "capacity": 150
+    }
+  ],
+  "containers": [
+    {
+      "id": "CONT-0001234",
+      "code": "ABCD1234567",
+      "type": "20ft",
+      "status": "empty",
+      "owner": "Maersk",
+      "weight": 2200,
+      "maxWeight": 28000,
+      "color": "#3498db"
+    },
+    {
+      "id": "CONT-0002345",
+      "code": "EFGH2345678",
+      "type": "40ft",
+      "status": "full",
+      "owner": "MSC",
+      "weight": 25000,
+      "maxWeight": 30480,
+      "color": "#e74c3c",
+      "cargo": "Electronics"
+    },
+    {
+      "id": "CONT-0003456",
+      "code": "IJKL3456789",
+      "type": "40ft-HC",
+      "status": "full",
+      "owner": "CMA CGM",
+      "weight": 22000,
+      "maxWeight": 30480,
+      "color": "#2ecc71",
+      "cargo": "Textiles"
+    },
+    {
+      "id": "CONT-0004567",
+      "code": "MNOP4567890",
+      "type": "20ft-Reefer",
+      "status": "full",
+      "owner": "Hapag-Lloyd",
+      "weight": 18000,
+      "maxWeight": 27400,
+      "color": "#9b59b6",
+      "cargo": "Frozen Food",
+      "temperature": -18
+    },
+    {
+      "id": "CONT-0005678",
+      "code": "QRST5678901",
+      "type": "40ft",
+      "status": "empty",
+      "owner": "COSCO",
+      "weight": 3800,
+      "maxWeight": 30480,
+      "color": "#f39c12"
+    }
+  ],
+  "containerYard": {
+    "name": "Main Container Yard",
+    "code": "YARD-01",
+    "rows": 10,
+    "columns": 20,
+    "maxStackHeight": 5,
+    "slots": [
+      {
+        "row": 1,
+        "column": 1,
+        "containerId": "CONT-0001234",
+        "stackPosition": 1
+      },
+      {
+        "row": 1,
+        "column": 2,
+        "containerId": "CONT-0002345",
+        "stackPosition": 1
+      },
+      {
+        "row": 1,
+        "column": 2,
+        "containerId": "CONT-0003456",
+        "stackPosition": 2
+      },
+      {
+        "row": 2,
+        "column": 5,
+        "containerId": "CONT-0004567",
+        "stackPosition": 1
+      }
+    ]
+  },
+  "tasks": [
+    {
+      "id": 1,
+      "description": "Chở container ABCD1234567 từ Nhà máy A đến B",
+      "type": "transport",
+      "fromFactory": 1,
+      "toFactory": 2,
+      "containerId": "CONT-0001234",
+      "completed": false,
+      "reward": 10,
+      "priority": "high"
+    },
+    {
+      "id": 2,
+      "description": "Giao hàng đến Nhà máy C",
+      "type": "delivery",
+      "toFactory": 3,
+      "containerId": "CONT-0002345",
+      "completed": false,
+      "reward": 15,
+      "priority": "medium"
+    },
+    {
+      "id": 3,
+      "description": "Hoàn thành 5 chuyến hàng",
+      "type": "milestone",
+      "target": 5,
+      "current": 0,
+      "completed": false,
+      "reward": 20,
+      "priority": "low"
+    },
+    {
+      "id": 4,
+      "description": "Xếp container vào yard slot A1-5",
+      "type": "stacking",
+      "containerId": "CONT-0005678",
+      "targetSlot": { "row": 1, "column": 5 },
+      "completed": false,
+      "reward": 12,
+      "priority": "high"
+    }
+  ],
+  "vehicles": [
+    {
+      "id": "TRUCK-001",
+      "type": "container-truck",
+      "code": "VH-001",
+      "capacity": 1,
+      "currentLoad": null,
+      "status": "available"
+    },
+    {
+      "id": "CRANE-001",
+      "type": "reach-stacker",
+      "code": "RS-001",
+      "capacity": 45000,
+      "status": "available"
+    },
+    {
+      "id": "CRANE-002",
+      "type": "rtg-crane",
+      "code": "RTG-001",
+      "capacity": 60000,
+      "status": "busy"
+    }
+  ],
+  "drivers": [
+    {
+      "id": "DRV-001",
+      "name": "Nguyễn Văn A",
+      "licenseNumber": "B2-123456",
+      "phone": "0901234567",
+      "company": "Vận tải Sài Gòn",
+      "status": "available",
+      "currentVehicle": null,
+      "rating": 4.8,
+      "totalTrips": 245
+    },
+    {
+      "id": "DRV-002",
+      "name": "Trần Văn B",
+      "licenseNumber": "B2-234567",
+      "phone": "0912345678",
+      "company": "Logistics Hà Nội",
+      "status": "on-duty",
+      "currentVehicle": "TRUCK-001",
+      "rating": 4.5,
+      "totalTrips": 189
+    },
+    {
+      "id": "DRV-003",
+      "name": "Lê Thị C",
+      "licenseNumber": "B2-345678",
+      "phone": "0923456789",
+      "company": "Express Transport",
+      "status": "available",
+      "currentVehicle": null,
+      "rating": 4.9,
+      "totalTrips": 312
+    }
+  ],
+  "gateTransactions": [
+    {
+      "id": "GATE-20260120-001",
+      "type": "check-in",
+      "driverId": "DRV-002",
+      "vehicleId": "TRUCK-001",
+      "containerId": "CONT-0001234",
+      "timestamp": "2026-01-20T08:30:00Z",
+      "gateNumber": "Gate-1",
+      "purpose": "pickup",
+      "status": "completed",
+      "documents": {
+        "deliveryOrder": "DO-2026-001",
+        "bookingNumber": "BK-2026-001",
+        "verified": true
+      }
+    },
+    {
+      "id": "GATE-20260120-002",
+      "type": "check-out",
+      "driverId": "DRV-002",
+      "vehicleId": "TRUCK-001",
+      "containerId": "CONT-0001234",
+      "timestamp": "2026-01-20T09:15:00Z",
+      "gateNumber": "Gate-2",
+      "status": "completed",
+      "sealNumber": "SEAL-123456",
+      "weight": 25000
+    }
+  ],
+  "workflowSteps": [
+    {
+      "step": 1,
+      "name": "Gate Check-In",
+      "description": "Tài xế đến cổng, xuất trình giấy tờ",
+      "requiredDocuments": ["Delivery Order", "Booking Number", "Driver License", "Vehicle Registration"],
+      "estimatedTime": 5
+    },
+    {
+      "step": 2,
+      "name": "Document Verification",
+      "description": "Kiểm tra và xác thực giấy tờ",
+      "requiredDocuments": ["All documents from step 1"],
+      "estimatedTime": 3
+    },
+    {
+      "step": 3,
+      "name": "Container Assignment",
+      "description": "Phân công container cho tài xế",
+      "estimatedTime": 2
+    },
+    {
+      "step": 4,
+      "name": "Move to Loading Area",
+      "description": "Di chuyển đến khu vực xếp/dỡ hàng",
+      "estimatedTime": 5
+    },
+    {
+      "step": 5,
+      "name": "Load/Unload Container",
+      "description": "Xếp hoặc dỡ container bằng crane",
+      "estimatedTime": 10
+    },
+    {
+      "step": 6,
+      "name": "Seal & Inspection",
+      "description": "Niêm phong và kiểm tra container",
+      "estimatedTime": 5
+    },
+    {
+      "step": 7,
+      "name": "Weighing",
+      "description": "Cân container (nếu cần)",
+      "estimatedTime": 3
+    },
+    {
+      "step": 8,
+      "name": "Gate Check-Out",
+      "description": "Kiểm tra cuối cùng và rời khỏi yard",
+      "estimatedTime": 5
+    }
+  ],
+  "activeJobs": [
+    {
+      "id": "JOB-001",
+      "driverId": "DRV-002",
+      "containerId": "CONT-0001234",
+      "vehicleId": "TRUCK-001",
+      "type": "import",
+      "currentStep": 5,
+      "status": "in-progress",
+      "startTime": "2026-01-20T08:30:00Z",
+      "estimatedCompletion": "2026-01-20T09:30:00Z",
+      "fromLocation": "Port",
+      "toLocation": "Warehouse A",
+      "steps": [
+        { "step": 1, "status": "completed", "completedAt": "2026-01-20T08:30:00Z" },
+        { "step": 2, "status": "completed", "completedAt": "2026-01-20T08:33:00Z" },
+        { "step": 3, "status": "completed", "completedAt": "2026-01-20T08:35:00Z" },
+        { "step": 4, "status": "completed", "completedAt": "2026-01-20T08:40:00Z" },
+        { "step": 5, "status": "in-progress", "startedAt": "2026-01-20T08:40:00Z" },
+        { "step": 6, "status": "pending" },
+        { "step": 7, "status": "pending" },
+        { "step": 8, "status": "pending" }
+      ]
+    }
+  ]
+}
+

@@ -2,27 +2,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import Modal from "./Modal";
+import { AVAILABLE_ASNS, ASN } from "../data/asnData";
 
 // Types
 type GameScene = "menu" | "road" | "gate" | "yard" | "door" | "checkout";
-type TaskType = "inbound" | "outbound";
-type ContainerStatus = "empty" | "full";
-
-interface ASN {
-  asnNumber: string;
-  type: TaskType;
-  factoryId: number;
-  factoryName: string;
-  containerNumber: string;
-  containerType: "20ft" | "40ft" | "40ft-HC";
-  status: ContainerStatus;
-  poNumber: string;
-  supplier: string;
-  expectedItems: number;
-  weight: number;
-  locationID?: number; // Unified location (yard slot or dock door)
-  locationType?: "yard" | "door"; // Type of location
-}
 
 interface Task {
   id: string;
@@ -82,87 +65,7 @@ const showToast = (
   }, 3000);
 };
 
-// Pre-defined ASN list (giống nghiệp vụ thật)
-const AVAILABLE_ASNS: ASN[] = [
-  {
-    asnNumber: "ASN-2024-001",
-    type: "inbound",
-    factoryId: 1,
-    factoryName: "Factory A",
-    containerNumber: "CONT-ABC-12345",
-    containerType: "40ft",
-    status: "full",
-    poNumber: "PO-2024-0156",
-    supplier: "Samsung Electronics",
-    expectedItems: 500,
-    weight: 18500,
-  },
-  {
-    asnNumber: "ASN-2024-002",
-    type: "inbound",
-    factoryId: 2,
-    factoryName: "Factory B",
-    containerNumber: "CONT-XYZ-67890",
-    containerType: "20ft",
-    status: "full",
-    poNumber: "PO-2024-0157",
-    supplier: "LG Display",
-    expectedItems: 250,
-    weight: 9200,
-  },
-  {
-    asnNumber: "ASN-2024-003",
-    type: "outbound",
-    factoryId: 3,
-    factoryName: "Warehouse C",
-    containerNumber: "CONT-DEF-11111",
-    containerType: "40ft-HC",
-    status: "empty",
-    poNumber: "PO-2024-0158",
-    supplier: "Hyundai Motors",
-    expectedItems: 0,
-    weight: 3500,
-  },
-  {
-    asnNumber: "ASN-2024-004",
-    type: "inbound",
-    factoryId: 4,
-    factoryName: "Factory D",
-    containerNumber: "CONT-GHI-22222",
-    containerType: "40ft",
-    status: "full",
-    poNumber: "PO-2024-0159",
-    supplier: "SK Hynix",
-    expectedItems: 800,
-    weight: 21000,
-  },
-  {
-    asnNumber: "ASN-2024-005",
-    type: "outbound",
-    factoryId: 5,
-    factoryName: "Warehouse E",
-    containerNumber: "CONT-JKL-33333",
-    containerType: "20ft",
-    status: "empty",
-    poNumber: "PO-2024-0160",
-    supplier: "Posco Steel",
-    expectedItems: 0,
-    weight: 2800,
-  },
-  {
-    asnNumber: "ASN-2024-006",
-    type: "inbound",
-    factoryId: 6,
-    factoryName: "Distribution Center F",
-    containerNumber: "CONT-MNO-44444",
-    containerType: "40ft",
-    status: "full",
-    poNumber: "PO-2024-0161",
-    supplier: "Coupang Logistics",
-    expectedItems: 1200,
-    weight: 19800,
-  },
-];
+// ASN list is now imported from shared data file
 
 export default function WarehouseGame() {
   const canvasRef = useRef<HTMLCanvasElement>(null);

@@ -38,6 +38,7 @@ interface TruckAnimation {
   phase:
     | "at_gate"
     | "entering"
+    | "moving_to_lane" // New phase: moving to lane via waypoint (avoiding warehouse)
     | "moving"
     | "approaching"
     | "turning"
@@ -46,6 +47,10 @@ interface TruckAnimation {
   waitTimer?: number; // Timer for waiting at gate (in frames)
   approachX?: number; // Position to stop before backing into slot
   approachY?: number;
+  laneX?: number; // Lane position X (final approach position)
+  laneY?: number; // Lane position Y (final approach position)
+  waypointX?: number; // Waypoint X (to avoid warehouse)
+  waypointY?: number; // Waypoint Y (to avoid warehouse)
   rotation?: number; // Rotation angle in radians (0 = up, Math.PI/2 = right, Math.PI = down, -Math.PI/2 = left)
 }
 
@@ -55,55 +60,83 @@ interface ParkedTruck {
   trailerId: string;
   x: number;
   y: number;
+  rotation: number; // Rotation based on slot area
+  area?: "top" | "bottom" | "left" | "right" | "topYard" | "bottomYard";
 }
 
 const CANVAS_WIDTH = 1600;
 const CANVAS_HEIGHT = 900;
 
-// Layout configuration - Professional warehouse yard layout
+// Slot orientation config - Dễ dàng tùy chỉnh hướng và kích thước slot
+const SLOT_CONFIG = {
+  // Horizontal slots (top/bottom areas) - Slot nằm ngang
+  horizontal: {
+    width: 40, // Rộng (chiều ngang)
+    height: 80, // Dài (chiều dọc) - vừa xe 60px
+    orientation: "vertical", // Xe đậu theo chiều dọc
+  },
+  // Vertical slots (left/right areas) - Slot nằm dọc
+  vertical: {
+    width: 80, // Dài (chiều ngang) - vừa xe 60px
+    height: 40, // Rộng (chiều dọc)
+    orientation: "horizontal", // Xe đậu theo chiều ngang
+  },
+  gap: 8, // Khoảng cách giữa các slots
+};
+
+// Lane config - Làn đường cho xe di chuyển (wrap box cho mỗi dãy slot)
+const LANE_CONFIG = {
+  width: 60, // Độ rộng lane (đủ cho xe 25px + margin)
+  color: "#A1A1AA", // Màu lane (asphalt)
+  borderColor: "#71717A", // Màu viền lane
+};
+
+// Layout configuration - Optimized for 20-30 slots per zone
 const LAYOUT = {
-  // Standard slot size - TO HƠN, DỄ NHÌN HƠN
-  slotWidth: 85,
-  slotHeight: 100,
-  slotGap: 14,
-
   // Warehouse center position
-  warehouseY: 370,
-  warehouseHeight: 140,
+  warehouseY: 320,
+  warehouseHeight: 100,
 
-  // Dock doors - 10 slots each side
-  dockCols: 10,
+  // Dock doors - 12 slots each side
+  dockCols: 12,
 
-  // Spacing between areas - RẤT RỘNG
-  yardDockSpacing: 90, // Khoảng cách giữa yard và dock - rất rộng
-  sideSpacing: 100, // Khoảng cách bên trái/phải
+  // Spacing between areas - ĐỀU NHAU 4 PHÍA
+  uniformSpacing: 60,
+  get yardDockSpacing() {
+    return this.uniformSpacing;
+  },
+  get sideSpacing() {
+    return this.uniformSpacing;
+  },
 
   // Calculated positions - căn giữa canvas
   get warehouseWidth() {
-    return this.dockCols * (this.slotWidth + this.slotGap) - this.slotGap;
+    return (
+      this.dockCols * (SLOT_CONFIG.horizontal.width + SLOT_CONFIG.gap) -
+      SLOT_CONFIG.gap
+    );
   },
   get warehouseX() {
-    // Căn giữa: (canvas width - warehouse width) / 2
     return (CANVAS_WIDTH - this.warehouseWidth) / 2;
   },
   // Parking areas - dock doors 2 phía + yard slots xung quanh
   parking: {
-    // Top dock doors (dính sát trên warehouse) - 10 slots
+    // Top dock doors - HORIZONTAL SLOTS
     topDock: {
       get x() {
         return LAYOUT.warehouseX;
       },
       get y() {
-        return LAYOUT.warehouseY - LAYOUT.slotHeight;
+        return LAYOUT.warehouseY - SLOT_CONFIG.horizontal.height;
       },
       get slotWidth() {
-        return LAYOUT.slotWidth;
+        return SLOT_CONFIG.horizontal.width;
       },
       get slotHeight() {
-        return LAYOUT.slotHeight;
+        return SLOT_CONFIG.horizontal.height;
       },
       get gap() {
-        return LAYOUT.slotGap;
+        return SLOT_CONFIG.gap;
       },
       rows: 1,
       get cols() {
@@ -111,7 +144,7 @@ const LAYOUT = {
       },
       area: "top",
     },
-    // Bottom dock doors (dính sát dưới warehouse) - 10 slots
+    // Bottom dock doors - HORIZONTAL SLOTS
     bottomDock: {
       get x() {
         return LAYOUT.warehouseX;
@@ -120,13 +153,13 @@ const LAYOUT = {
         return LAYOUT.warehouseY + LAYOUT.warehouseHeight;
       },
       get slotWidth() {
-        return LAYOUT.slotWidth;
+        return SLOT_CONFIG.horizontal.width;
       },
       get slotHeight() {
-        return LAYOUT.slotHeight;
+        return SLOT_CONFIG.horizontal.height;
       },
       get gap() {
-        return LAYOUT.slotGap;
+        return SLOT_CONFIG.gap;
       },
       rows: 1,
       get cols() {
@@ -134,24 +167,22 @@ const LAYOUT = {
       },
       area: "bottom",
     },
-    // Top yard (phía trên top dock doors) - 10 slots
+    // Top yard - SÁT TƯỜNG TRÊN - HORIZONTAL SLOTS
     topYard: {
       get x() {
         return LAYOUT.warehouseX;
       },
       get y() {
-        return (
-          LAYOUT.warehouseY - LAYOUT.slotHeight * 2 - LAYOUT.yardDockSpacing
-        );
+        return 25; // Sát tường trên
       },
       get slotWidth() {
-        return LAYOUT.slotWidth;
+        return SLOT_CONFIG.horizontal.width;
       },
       get slotHeight() {
-        return LAYOUT.slotHeight;
+        return SLOT_CONFIG.horizontal.height;
       },
       get gap() {
-        return LAYOUT.slotGap;
+        return SLOT_CONFIG.gap;
       },
       rows: 1,
       get cols() {
@@ -159,27 +190,22 @@ const LAYOUT = {
       },
       area: "topYard",
     },
-    // Bottom yard (phía dưới bottom dock doors) - 10 slots
+    // Bottom yard - SÁT TƯỜNG DƯỚI - HORIZONTAL SLOTS
     bottomYard: {
       get x() {
         return LAYOUT.warehouseX;
       },
       get y() {
-        return (
-          LAYOUT.warehouseY +
-          LAYOUT.warehouseHeight +
-          LAYOUT.slotHeight +
-          LAYOUT.yardDockSpacing
-        );
+        return CANVAS_HEIGHT - 25 - SLOT_CONFIG.horizontal.height; // Sát tường dưới
       },
       get slotWidth() {
-        return LAYOUT.slotWidth;
+        return SLOT_CONFIG.horizontal.width;
       },
       get slotHeight() {
-        return LAYOUT.slotHeight;
+        return SLOT_CONFIG.horizontal.height;
       },
       get gap() {
-        return LAYOUT.slotGap;
+        return SLOT_CONFIG.gap;
       },
       rows: 1,
       get cols() {
@@ -187,47 +213,45 @@ const LAYOUT = {
       },
       area: "bottomYard",
     },
-    // Left area (yard slots bên trái warehouse) - CÂN ĐỐI VỚI TOP/BOTTOM
+    // Left yard - SÁT TƯỜNG TRÁI - VERTICAL SLOTS (nằm ngang)
     left: {
       get x() {
-        return LAYOUT.warehouseX - LAYOUT.slotWidth - LAYOUT.sideSpacing;
+        return 25; // Sát tường trái
       },
       get y() {
-        // Căn giữa với warehouse: bắt đầu từ top dock
-        return LAYOUT.warehouseY - LAYOUT.slotHeight;
+        return LAYOUT.warehouseY - SLOT_CONFIG.vertical.height;
       },
       get slotWidth() {
-        return LAYOUT.slotWidth;
+        return SLOT_CONFIG.vertical.width; // Dài (80px)
       },
       get slotHeight() {
-        return LAYOUT.slotHeight;
+        return SLOT_CONFIG.vertical.height; // Ngắn (40px)
       },
       get gap() {
-        return LAYOUT.slotGap;
+        return SLOT_CONFIG.gap;
       },
-      rows: 4, // 4 slots để cân đối với chiều cao warehouse + 2 dock doors
+      rows: 4,
       cols: 1,
       area: "left",
     },
-    // Right area (yard slots bên phải warehouse) - CÂN ĐỐI VỚI TOP/BOTTOM
+    // Right yard - SÁT TƯỜNG PHẢI - VERTICAL SLOTS (nằm ngang)
     right: {
       get x() {
-        return LAYOUT.warehouseX + LAYOUT.warehouseWidth + LAYOUT.sideSpacing;
+        return CANVAS_WIDTH - 25 - SLOT_CONFIG.vertical.width; // Sát tường phải
       },
       get y() {
-        // Căn giữa với warehouse: bắt đầu từ top dock
-        return LAYOUT.warehouseY - LAYOUT.slotHeight;
+        return LAYOUT.warehouseY - SLOT_CONFIG.vertical.height;
       },
       get slotWidth() {
-        return LAYOUT.slotWidth;
+        return SLOT_CONFIG.vertical.width; // Dài (80px)
       },
       get slotHeight() {
-        return LAYOUT.slotHeight;
+        return SLOT_CONFIG.vertical.height; // Ngắn (40px)
       },
       get gap() {
-        return LAYOUT.slotGap;
+        return SLOT_CONFIG.gap;
       },
-      rows: 4, // 4 slots để cân đối với chiều cao warehouse + 2 dock doors
+      rows: 4,
       cols: 1,
       area: "right",
     },
@@ -486,12 +510,34 @@ export default function YardManagement() {
           );
 
           if (!alreadyParked) {
+            // Find slot to get area
+            const slot = ALL_PARKING_SLOTS.find(
+              (s) => s.id === truck.targetSlotId,
+            );
+            const area = slot?.area;
+
+            // Calculate rotation based on area
+            // Trái -> quay phải (Math.PI/2), Phải -> quay trái (-Math.PI/2)
+            // Trên -> quay xuống (Math.PI), Dưới -> quay lên (0)
+            let rotation = 0;
+            if (area === "left") {
+              rotation = Math.PI / 2; // Quay phải
+            } else if (area === "right") {
+              rotation = -Math.PI / 2; // Quay trái
+            } else if (area === "top" || area === "topYard") {
+              rotation = Math.PI; // Quay xuống
+            } else if (area === "bottom" || area === "bottomYard") {
+              rotation = 0; // Quay lên
+            }
+
             updated.push({
               slotId: truck.targetSlotId,
               containerNumber: truck.containerNumber,
               trailerId: truck.trailerId,
               x: truck.targetX,
               y: truck.targetY,
+              rotation: rotation,
+              area: area,
             });
           }
         });
@@ -611,13 +657,13 @@ export default function YardManagement() {
         return prevTrucks;
       }
 
-      // Create truck animation - Start from Entry Gate
+      // Create truck animation - Start from Entry Gate (căn giữa gate)
       const truck: TruckAnimation = {
         containerId: newContainer.id,
         containerNumber: newContainer.containerNumber,
         trailerId: trailerId,
-        x: 150, // Start from Entry Gate position
-        y: 780, // Entry Gate Y position
+        x: ENTRY_GATE.x + ENTRY_GATE.width / 2, // Căn giữa gate
+        y: ENTRY_GATE.y + ENTRY_GATE.height / 2, // Căn giữa gate
         targetSlotId: emptySlot.id,
         targetX: emptySlot.x + emptySlot.w / 2,
         targetY: emptySlot.y + emptySlot.h / 2,
@@ -683,47 +729,136 @@ export default function YardManagement() {
             updatedTruck.waitTimer = 0;
           }
         } else if (updatedTruck.phase === "entering") {
-          // Move from gate into yard area
-          updatedTruck.y -= speed; // Move up from gate
-          if (updatedTruck.y <= 600) {
+          // Move from gate to safe zone - DƯỚI warehouse
+          const safeY = LAYOUT.warehouseY + LAYOUT.warehouseHeight + 150; // Dưới warehouse
+          const dy = safeY - updatedTruck.y;
+
+          if (Math.abs(dy) > speed) {
+            updatedTruck.y += (dy / Math.abs(dy)) * speed;
+          } else {
+            updatedTruck.y = safeY;
+            updatedTruck.phase = "moving_to_lane";
+          }
+        } else if (updatedTruck.phase === "moving_to_lane") {
+          // Di chuyển đến lane của slot - VÒNG QUANH WAREHOUSE
+          if (!updatedTruck.laneX || !updatedTruck.laneY) {
+            const slot = ALL_PARKING_SLOTS.find(
+              (s) => s.id === updatedTruck.targetSlotId,
+            );
+            const area = slot?.area;
+
+            // Tính toán lane position (đường đi vòng quanh warehouse)
+            if (area === "left") {
+              // Left slots: Lane ở bên PHẢI các slot
+              updatedTruck.laneX = slot!.x + slot!.w + LANE_CONFIG.width / 2;
+              updatedTruck.laneY = slot!.y + slot!.h / 2;
+              // Waypoint: đi sang trái warehouse trước
+              updatedTruck.waypointX = LAYOUT.warehouseX - 100;
+              updatedTruck.waypointY =
+                LAYOUT.warehouseY + LAYOUT.warehouseHeight / 2;
+            } else if (area === "right") {
+              // Right slots: Lane ở bên TRÁI các slot
+              updatedTruck.laneX = slot!.x - LANE_CONFIG.width / 2;
+              updatedTruck.laneY = slot!.y + slot!.h / 2;
+              // Waypoint: đi sang phải warehouse trước
+              updatedTruck.waypointX =
+                LAYOUT.warehouseX + LAYOUT.warehouseWidth + 100;
+              updatedTruck.waypointY =
+                LAYOUT.warehouseY + LAYOUT.warehouseHeight / 2;
+            } else if (area === "top" || area === "topYard") {
+              // Top slots: Lane ở DƯỚI các slot
+              updatedTruck.laneX = slot!.x + slot!.w / 2;
+              updatedTruck.laneY = slot!.y + slot!.h + LANE_CONFIG.width / 2;
+              // Waypoint: không cần (đã ở dưới)
+              updatedTruck.waypointX = updatedTruck.laneX;
+              updatedTruck.waypointY = updatedTruck.y; // Giữ Y hiện tại
+            } else {
+              // Bottom slots: Lane ở TRÊN các slot
+              updatedTruck.laneX = slot!.x + slot!.w / 2;
+              updatedTruck.laneY = slot!.y - LANE_CONFIG.width / 2;
+              // Waypoint: không cần (đã ở dưới)
+              updatedTruck.waypointX = updatedTruck.laneX;
+              updatedTruck.waypointY = updatedTruck.y; // Giữ Y hiện tại
+            }
+          }
+
+          // Di chuyển đến waypoint trước (tránh warehouse)
+          const dxWaypoint = updatedTruck.waypointX! - updatedTruck.x;
+          const dyWaypoint = updatedTruck.waypointY! - updatedTruck.y;
+          const distWaypoint = Math.sqrt(
+            dxWaypoint * dxWaypoint + dyWaypoint * dyWaypoint,
+          );
+
+          if (distWaypoint > speed) {
+            // Chưa đến waypoint
+            updatedTruck.x += (dxWaypoint / distWaypoint) * speed;
+            updatedTruck.y += (dyWaypoint / distWaypoint) * speed;
+          } else {
+            // Đã đến waypoint, chuyển sang moving
+            updatedTruck.x = updatedTruck.waypointX!;
+            updatedTruck.y = updatedTruck.waypointY!;
             updatedTruck.phase = "moving";
           }
         } else if (updatedTruck.phase === "moving") {
-          // Move towards slot area - stop before slot to prepare for backing
-          // Calculate approach position (stop 60px before slot)
-          if (!updatedTruck.approachX || !updatedTruck.approachY) {
-            updatedTruck.approachX = updatedTruck.targetX;
-            updatedTruck.approachY = updatedTruck.targetY + 60; // Stop 60px below slot
-          }
+          // Di chuyển từ waypoint đến lane position (approach slot)
+          const dxLane = updatedTruck.laneX! - updatedTruck.x;
+          const dyLane = updatedTruck.laneY! - updatedTruck.y;
+          const distLane = Math.sqrt(dxLane * dxLane + dyLane * dyLane);
 
-          const dx = updatedTruck.approachX - updatedTruck.x;
-          const dy = updatedTruck.approachY - updatedTruck.y;
-          const distance = Math.sqrt(dx * dx + dy * dy);
-
-          if (distance < speed) {
-            updatedTruck.x = updatedTruck.approachX;
-            updatedTruck.y = updatedTruck.approachY;
-            updatedTruck.phase = "turning";
-            updatedTruck.waitTimer = 0;
+          if (distLane > speed) {
+            // Chưa đến lane position
+            updatedTruck.x += (dxLane / distLane) * speed;
+            updatedTruck.y += (dyLane / distLane) * speed;
           } else {
-            updatedTruck.x += (dx / distance) * speed;
-            updatedTruck.y += (dy / distance) * speed;
+            // Đã đến lane position
+            updatedTruck.x = updatedTruck.laneX!;
+            updatedTruck.y = updatedTruck.laneY!;
+            updatedTruck.phase = "approaching";
+            updatedTruck.waitTimer = 0;
           }
-        } else if (updatedTruck.phase === "turning") {
-          // Turn right 90 degrees (gradually rotate from 0 to Math.PI/2)
+        } else if (updatedTruck.phase === "approaching") {
+          // Rotate to correct angle for backing into slot
+          const slot = ALL_PARKING_SLOTS.find(
+            (s) => s.id === updatedTruck.targetSlotId,
+          );
+          const area = slot?.area;
+
+          let targetRotation = 0;
+          if (area === "left") {
+            targetRotation = Math.PI / 2; // Face right to back left
+          } else if (area === "right") {
+            targetRotation = -Math.PI / 2; // Face left to back right
+          } else if (area === "top" || area === "topYard") {
+            targetRotation = Math.PI; // Face down to back up
+          } else {
+            targetRotation = 0; // Face up to back down
+          }
+
           updatedTruck.waitTimer = (updatedTruck.waitTimer || 0) + 1;
-          const turnProgress = updatedTruck.waitTimer / 30; // 0 to 1
-          updatedTruck.rotation = (Math.PI / 2) * turnProgress; // 0 to 90 degrees
+          const turnProgress = Math.min(updatedTruck.waitTimer / 30, 1);
+          updatedTruck.rotation = targetRotation * turnProgress;
 
           if (updatedTruck.waitTimer >= 30) {
-            // 0.5 seconds - turn complete
-            updatedTruck.rotation = Math.PI / 2; // 90 degrees right
+            updatedTruck.rotation = targetRotation;
             updatedTruck.phase = "backing";
           }
         } else if (updatedTruck.phase === "backing") {
-          // Back into slot (move from approach position to target)
-          // Keep rotation at 90 degrees (facing right)
-          updatedTruck.rotation = Math.PI / 2;
+          // Back into slot - keep rotation
+          const slot = ALL_PARKING_SLOTS.find(
+            (s) => s.id === updatedTruck.targetSlotId,
+          );
+          const area = slot?.area;
+
+          // Set final rotation based on area
+          if (area === "left") {
+            updatedTruck.rotation = Math.PI / 2;
+          } else if (area === "right") {
+            updatedTruck.rotation = -Math.PI / 2;
+          } else if (area === "top" || area === "topYard") {
+            updatedTruck.rotation = Math.PI;
+          } else {
+            updatedTruck.rotation = 0;
+          }
 
           const dx = updatedTruck.targetX - updatedTruck.x;
           const dy = updatedTruck.targetY - updatedTruck.y;
@@ -799,15 +934,15 @@ export default function YardManagement() {
       ctx.lineWidth = 4;
       ctx.strokeRect(slot.x, slot.y, slot.w, slot.h);
 
-      // Door number - yellow on dark background
+      // Door number - yellow on dark background (smaller font)
       ctx.fillStyle = "#FCD34D";
-      ctx.font = "bold 16px 'Inter', 'Segoe UI', sans-serif";
+      ctx.font = "bold 11px 'Inter', 'Segoe UI', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
       ctx.fillText(
         `D${String(slot.id).padStart(2, "0")}`,
         slot.x + slot.w / 2,
-        slot.y + 25,
+        slot.y + slot.h / 2,
       );
     } else {
       // === YARD PARKING - Realistic parking lot style ===
@@ -816,9 +951,9 @@ export default function YardManagement() {
       ctx.fillStyle = "#A1A1AA";
       ctx.fillRect(slot.x, slot.y, slot.w, slot.h);
 
-      // Parking bay lines - white paint
+      // Parking bay lines - white paint (thinner for compact slots)
       ctx.strokeStyle = "#FFFFFF";
-      ctx.lineWidth = 3;
+      ctx.lineWidth = 2;
 
       // Left line
       ctx.beginPath();
@@ -856,29 +991,34 @@ export default function YardManagement() {
         ctx.stroke();
       }
 
-      // Corner markers (yellow) - realistic parking lot detail
+      // Corner markers (yellow) - smaller for compact slots
       ctx.fillStyle = "#FCD34D";
-      const cornerSize = 8;
+      const cornerSize = 5;
 
       // Top-left corner
-      ctx.fillRect(slot.x + 2, slot.y + 2, cornerSize, 2);
-      ctx.fillRect(slot.x + 2, slot.y + 2, 2, cornerSize);
+      ctx.fillRect(slot.x + 2, slot.y + 2, cornerSize, 1.5);
+      ctx.fillRect(slot.x + 2, slot.y + 2, 1.5, cornerSize);
 
       // Top-right corner
-      ctx.fillRect(slot.x + slot.w - cornerSize - 2, slot.y + 2, cornerSize, 2);
-      ctx.fillRect(slot.x + slot.w - 4, slot.y + 2, 2, cornerSize);
+      ctx.fillRect(
+        slot.x + slot.w - cornerSize - 2,
+        slot.y + 2,
+        cornerSize,
+        1.5,
+      );
+      ctx.fillRect(slot.x + slot.w - 3.5, slot.y + 2, 1.5, cornerSize);
 
-      // Parking number - large white text
+      // Parking number - smaller white text
       ctx.fillStyle = "#FFFFFF";
-      ctx.font = "bold 18px 'Inter', 'Segoe UI', sans-serif";
+      ctx.font = "bold 11px 'Inter', 'Segoe UI', sans-serif";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
 
       // Add shadow for better visibility
       ctx.shadowColor = "rgba(0, 0, 0, 0.5)";
-      ctx.shadowBlur = 3;
-      ctx.shadowOffsetX = 1;
-      ctx.shadowOffsetY = 1;
+      ctx.shadowBlur = 2;
+      ctx.shadowOffsetX = 0.5;
+      ctx.shadowOffsetY = 0.5;
 
       ctx.fillText(
         `P${String(slot.id).padStart(2, "0")}`,
@@ -908,6 +1048,72 @@ export default function YardManagement() {
         }
       }
     }
+
+    // === PERIMETER FENCE (Tường rào xung quanh yard) ===
+    const fenceMargin = 15; // Khoảng cách từ edge canvas
+    const fenceWidth = 6;
+
+    // Fence - dark gray metal
+    ctx.fillStyle = "#52525B";
+
+    // Top fence
+    ctx.fillRect(
+      fenceMargin,
+      fenceMargin,
+      CANVAS_WIDTH - fenceMargin * 2,
+      fenceWidth,
+    );
+
+    // Bottom fence (trừ chỗ cổng)
+    ctx.fillRect(
+      fenceMargin,
+      CANVAS_HEIGHT - fenceMargin - fenceWidth,
+      CANVAS_WIDTH - fenceMargin * 2,
+      fenceWidth,
+    );
+
+    // Left fence
+    ctx.fillRect(
+      fenceMargin,
+      fenceMargin,
+      fenceWidth,
+      CANVAS_HEIGHT - fenceMargin * 2,
+    );
+
+    // Right fence
+    ctx.fillRect(
+      CANVAS_WIDTH - fenceMargin - fenceWidth,
+      fenceMargin,
+      fenceWidth,
+      CANVAS_HEIGHT - fenceMargin * 2,
+    );
+
+    // Fence posts (trụ tường) - darker
+    ctx.fillStyle = "#3F3F46";
+    const postSize = 10;
+
+    // Corner posts
+    ctx.fillRect(fenceMargin - 2, fenceMargin - 2, postSize, postSize); // Top-left
+    ctx.fillRect(
+      CANVAS_WIDTH - fenceMargin - postSize + 2,
+      fenceMargin - 2,
+      postSize,
+      postSize,
+    ); // Top-right
+    ctx.fillRect(
+      fenceMargin - 2,
+      CANVAS_HEIGHT - fenceMargin - postSize + 2,
+      postSize,
+      postSize,
+    ); // Bottom-left
+    ctx.fillRect(
+      CANVAS_WIDTH - fenceMargin - postSize + 2,
+      CANVAS_HEIGHT - fenceMargin - postSize + 2,
+      postSize,
+      postSize,
+    ); // Bottom-right
+
+    // Bỏ kẻ đường - xe sẽ tự động tìm đường đi
 
     // === WAREHOUSE BUILDING - Modern industrial ===
     // Warehouse wall - light industrial color
@@ -1260,7 +1466,7 @@ export default function YardManagement() {
       }
     });
 
-    // Draw parked trucks (rotated 180 degrees - backing into slot)
+    // Draw parked trucks (with rotation based on area)
     parkedTrucks.forEach((truck) => {
       // Find container status by container number
       const container = containers.find(
@@ -1277,7 +1483,70 @@ export default function YardManagement() {
         trailerId: truck.trailerId,
         containerStatus: containerStatus,
         isParked: true,
+        rotation: truck.rotation, // Rotation based on slot area
       });
+
+      // Draw container ID sign - THIẾT KẾ RÕ RÀNG, DỄ NHÌN
+      const slot = ALL_PARKING_SLOTS.find((s) => s.id === truck.slotId);
+      if (slot) {
+        // Sign dimensions - vừa đủ lớn để đọc
+        const signWidth = slot.w - 4; // Vừa khít slot
+        const signHeight = 18;
+        let signX = slot.x + 2;
+        let signY = slot.y + 2;
+
+        // Position sign ở góc slot dựa trên area - KHÔNG CHỒNG LÊN XE
+        if (truck.area === "left" || truck.area === "right") {
+          // Left/Right: Sign ở góc trên slot (horizontal slot)
+          signX = slot.x + 2;
+          signY = slot.y + 2;
+        } else if (truck.area === "top" || truck.area === "topYard") {
+          // Top: Sign ở góc dưới slot (xe ở trên, sign ở dưới)
+          signX = slot.x + 2;
+          signY = slot.y + slot.h - signHeight - 2;
+        } else {
+          // Bottom: Sign ở góc trên slot (xe ở dưới, sign ở trên)
+          signX = slot.x + 2;
+          signY = slot.y + 2;
+        }
+
+        // Sign background - gradient xanh dương chuyên nghiệp
+        const gradient = ctx.createLinearGradient(
+          signX,
+          signY,
+          signX,
+          signY + signHeight,
+        );
+        gradient.addColorStop(0, "#3B82F6"); // Blue-500
+        gradient.addColorStop(1, "#2563EB"); // Blue-600
+        ctx.fillStyle = gradient;
+        ctx.fillRect(signX, signY, signWidth, signHeight);
+
+        // Sign border - darker blue
+        ctx.strokeStyle = "#1E40AF"; // Blue-800
+        ctx.lineWidth = 1;
+        ctx.strokeRect(signX, signY, signWidth, signHeight);
+
+        // Container ID text - white, bold, dễ đọc
+        ctx.fillStyle = "#FFFFFF";
+        ctx.font = "bold 10px 'Inter', 'Segoe UI', sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+
+        // Add subtle shadow for better readability
+        ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
+        ctx.shadowBlur = 2;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 1;
+
+        ctx.fillText(
+          truck.containerNumber,
+          signX + signWidth / 2,
+          signY + signHeight / 2,
+        );
+
+        ctx.shadowBlur = 0;
+      }
     });
 
     // Legend removed from canvas - will be rendered as HTML component below

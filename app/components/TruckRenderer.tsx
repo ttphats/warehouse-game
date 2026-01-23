@@ -117,6 +117,23 @@ export const drawTruck = (
     ctx.stroke();
   }
 
+  // Trailer ID on container (if provided)
+  if (trailerId) {
+    ctx.fillStyle = "#FFFFFF";
+    ctx.font = "bold 9px 'Inter', 'Segoe UI', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+
+    // Add dark background for better visibility
+    ctx.shadowColor = "rgba(0, 0, 0, 0.8)";
+    ctx.shadowBlur = 3;
+    ctx.shadowOffsetX = 0;
+    ctx.shadowOffsetY = 0;
+
+    ctx.fillText(trailerId, x, containerY + containerH / 2);
+    ctx.shadowBlur = 0;
+  }
+
   // Wheels (2 small circles at bottom of container)
   ctx.fillStyle = "#424242";
   ctx.beginPath();
